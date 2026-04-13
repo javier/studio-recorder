@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Studio Recorder</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #0c0c0e;
+    --surface: #16161a;
+    --surface2: #1e1e24;
+    --border: #2a2a32;
+    --text: #e2e2e6;
+    --text-dim: #7a7a86;
+    --accent: #e04040;
+    --accent-glow: rgba(224, 64, 64, 0.3);
+    --green: #34d399;
+    --green-glow: rgba(52, 211, 153, 0.3);
+    --amber: #fbbf24;
+  }
+
+  body {
+    font-family: 'Outfit', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  .app {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 32px 24px;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 36px;
+  }
+
+  header .icon {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 12px var(--accent-glow);
+  }
+
+  header .icon.recording {
+    animation: pulse 1s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; box-shadow: 0 0 12px var(--accent-glow); }
+    50% { opacity: 0.4; box-shadow: 0 0 4px var(--accent-glow); }
+  }
+
+  header h1 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .timer {
+    margin-left: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+    transition: color 0.3s;
+  }
+
+  .timer.active { color: var(--accent); }
+
+  .config {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .field label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-dim);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .field select {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-family: 'Outfit', sans-serif;
+    font-size: 14px;
+    outline: none;
+    cursor: pointer;
+    transition: border-color 0.2s;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%237a7a86'%3E%3Cpath d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+  }
+
+  .field select:hover { border-color: #3a3a44; }
+  .field select:focus { border-color: var(--accent); }
+  .field select:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .previews {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .preview-box {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    aspect-ratio: 16/9;
+  }
+
+  .preview-box video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .preview-label {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    background: rgba(0,0,0,0.7);
+    padding: 4px 8px;
+    border-radius: 4px;
+    color: var(--text-dim);
+  }
+
+  .rec-badge {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: none;
+    align-items: center;
+    gap: 5px;
+    background: rgba(224, 64, 64, 0.9);
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    animation: pulse 1s ease-in-out infinite;
+  }
+
+  .rec-badge .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: white;
+  }
+
+  .meter-section { margin-bottom: 24px; }
+
+  .meter-section label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-dim);
+    font-family: 'JetBrains Mono', monospace;
+    margin-bottom: 8px;
+  }
+
+  .meter-track {
+    width: 100%;
+    height: 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .meter-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--green);
+    border-radius: 4px;
+    transition: width 0.05s linear;
+  }
+
+  .meter-fill.hot { background: var(--amber); }
+  .meter-fill.clip { background: var(--accent); }
+
+  .controls {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  button {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    border: none;
+    border-radius: 6px;
+    padding: 12px 28px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  button:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  .btn-record {
+    background: var(--accent);
+    color: white;
+    box-shadow: 0 0 20px var(--accent-glow);
+  }
+
+  .btn-record:hover:not(:disabled) {
+    background: #c43535;
+    box-shadow: 0 0 30px var(--accent-glow);
+  }
+
+  .btn-stop {
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+
+  .btn-stop:hover:not(:disabled) {
+    background: #26262e;
+    border-color: var(--text-dim);
+  }
+
+  .status {
+    margin-left: 16px;
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+
+  .status.ok { color: var(--green); }
+
+  .info {
+    margin-top: 24px;
+    padding: 12px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.8;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .info code {
+    color: var(--text);
+    background: var(--surface2);
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+
+  .checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    grid-column: 1 / -1;
+  }
+
+  .checkbox-row input[type="checkbox"] {
+    accent-color: var(--accent);
+    width: 16px; height: 16px;
+    cursor: pointer;
+  }
+
+  .checkbox-row label {
+    font-size: 13px;
+    color: var(--text-dim);
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="icon" id="headerDot"></div>
+    <h1>Studio Recorder</h1>
+    <div class="timer" id="timer">00:00:00</div>
+  </header>
+
+  <div class="config">
+    <div class="field">
+      <label>Webcam</label>
+      <select id="webcamSelect"><option>Loading...</option></select>
+    </div>
+    <div class="field">
+      <label>Microphone</label>
+      <select id="micSelect"><option>Loading...</option></select>
+    </div>
+    <div class="checkbox-row">
+      <input type="checkbox" id="separateFiles" checked>
+      <label for="separateFiles">Record webcam and screen as separate files (recommended for editing)</label>
+    </div>
+  </div>
+
+  <div class="previews">
+    <div class="preview-box">
+      <video id="webcamPreview" autoplay muted playsinline></video>
+      <div class="preview-label">Webcam</div>
+      <div class="rec-badge" id="webcamRec"><div class="dot"></div>REC</div>
+    </div>
+    <div class="preview-box">
+      <video id="screenPreview" autoplay muted playsinline></video>
+      <div class="preview-label">Screen</div>
+      <div class="rec-badge" id="screenRec"><div class="dot"></div>REC</div>
+    </div>
+  </div>
+
+  <div class="meter-section">
+    <label>Mic Level</label>
+    <div class="meter-track">
+      <div class="meter-fill" id="meterFill"></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="btn-record" id="btnRecord">Start Recording</button>
+    <button class="btn-stop" id="btnStop" disabled>Stop &amp; Save</button>
+    <span class="status" id="status"></span>
+  </div>
+
+  <div class="info">
+    Output: <code>webcam-[timestamp].webm</code> + <code>screen-[timestamp].webm</code><br>
+    On Chrome/Edge you can pick a save folder. Other browsers will download to your default location.<br>
+    The browser will ask which screen or window to share when you click Start.<br>
+    Tick "Share audio" in the browser picker to capture system sound with the screen.<br><br>
+    <strong style="color:var(--text)">If recording fails on file://</strong>, serve over localhost instead:<br>
+    <code>cd /path/to/folder && python3 -m http.server 8080</code><br>
+    Then open <code>http://localhost:8080/studio-recorder.html</code>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+let webcamStream = null;
+let screenStream = null;
+let webcamRecorder = null;
+let screenRecorder = null;
+let webcamChunks = [];
+let screenChunks = [];
+let timerInterval = null;
+let startTime = 0;
+let audioCtx = null;
+let analyser = null;
+let meterRAF = null;
+let folderHandle = null;
+
+function getCodec() {
+  const codecs = [
+    'video/webm;codecs=vp9,opus',
+    'video/webm;codecs=vp8,opus',
+    'video/webm;codecs=vp9',
+    'video/webm;codecs=vp8',
+    'video/webm',
+  ];
+  for (const c of codecs) {
+    if (MediaRecorder.isTypeSupported(c)) return c;
+  }
+  return '';
+}
+
+async function loadDevices() {
+  try {
+    const tempStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+    tempStream.getTracks().forEach(t => t.stop());
+  } catch(e) {
+    setStatus('Grant camera/mic permission to continue');
+    return;
+  }
+
+  const devices = await navigator.mediaDevices.enumerateDevices();
+  const webcamSel = $('webcamSelect');
+  const micSel = $('micSelect');
+  webcamSel.innerHTML = '';
+  micSel.innerHTML = '';
+
+  devices.filter(d => d.kind === 'videoinput').forEach((d, i) => {
+    const opt = document.createElement('option');
+    opt.value = d.deviceId;
+    opt.textContent = d.label || `Camera ${i + 1}`;
+    webcamSel.appendChild(opt);
+  });
+
+  devices.filter(d => d.kind === 'audioinput').forEach((d, i) => {
+    const opt = document.createElement('option');
+    opt.value = d.deviceId;
+    opt.textContent = d.label || `Microphone ${i + 1}`;
+    micSel.appendChild(opt);
+  });
+
+  if (!webcamSel.options.length) webcamSel.innerHTML = '<option value="">No webcam found</option>';
+  if (!micSel.options.length) micSel.innerHTML = '<option value="">No mic found</option>';
+
+  startWebcamPreview();
+}
+
+async function startWebcamPreview() {
+  if (webcamStream) webcamStream.getTracks().forEach(t => t.stop());
+
+  const camId = $('webcamSelect').value;
+  const micId = $('micSelect').value;
+  if (!camId) return;
+
+  try {
+    webcamStream = await navigator.mediaDevices.getUserMedia({
+      video: { deviceId: { exact: camId }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+      audio: { deviceId: { exact: micId }, echoCancellation: true, noiseSuppression: true }
+    });
+    $('webcamPreview').srcObject = webcamStream;
+    startMeter(webcamStream);
+  } catch(e) {
+    setStatus('Webcam/mic error: ' + e.message);
+  }
+}
+
+function startMeter(stream) {
+  if (audioCtx) audioCtx.close();
+  audioCtx = new AudioContext();
+  const source = audioCtx.createMediaStreamSource(stream);
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 256;
+  source.connect(analyser);
+  updateMeter();
+}
+
+function updateMeter() {
+  if (!analyser) return;
+  const data = new Uint8Array(analyser.fftSize);
+  analyser.getByteTimeDomainData(data);
+  let sum = 0;
+  for (let i = 0; i < data.length; i++) {
+    const v = (data[i] - 128) / 128;
+    sum += v * v;
+  }
+  const pct = Math.min(100, Math.sqrt(sum / data.length) * 300);
+  const fill = $('meterFill');
+  fill.style.width = pct + '%';
+  fill.className = 'meter-fill' + (pct > 85 ? ' clip' : pct > 60 ? ' hot' : '');
+  meterRAF = requestAnimationFrame(updateMeter);
+}
+
+function startTimer() {
+  startTime = Date.now();
+  timerInterval = setInterval(() => {
+    const ms = Date.now() - startTime;
+    const h = String(Math.floor(ms / 3600000)).padStart(2, '0');
+    const m = String(Math.floor((ms % 3600000) / 60000)).padStart(2, '0');
+    const s = String(Math.floor((ms % 60000) / 1000)).padStart(2, '0');
+    $('timer').textContent = `${h}:${m}:${s}`;
+  }, 200);
+  $('timer').classList.add('active');
+  $('headerDot').classList.add('recording');
+}
+
+function stopTimer() {
+  clearInterval(timerInterval);
+  $('timer').classList.remove('active');
+  $('headerDot').classList.remove('recording');
+}
+
+function setStatus(msg, ok = false) {
+  $('status').textContent = msg;
+  $('status').className = 'status' + (ok ? ' ok' : '');
+}
+
+function formatBytes(b) {
+  if (b < 1024) return b + ' B';
+  if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+  return (b / 1048576).toFixed(1) + ' MB';
+}
+
+async function pickFolder() {
+  if (!window.showDirectoryPicker) return null;
+  try {
+    return await window.showDirectoryPicker({ mode: 'readwrite' });
+  } catch(e) { return null; }
+}
+
+async function saveBlob(blob, filename) {
+  if (folderHandle) {
+    try {
+      const fh = await folderHandle.getFileHandle(filename, { create: true });
+      const w = await fh.createWritable();
+      await w.write(blob);
+      await w.close();
+      return true;
+    } catch(e) { console.error('FS save failed:', e); }
+  }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+  return false;
+}
+
+async function startRecording() {
+  try {
+    // 1. Get screen stream FIRST (browser shows its own picker)
+    setStatus('Pick your screen...');
+    try {
+      screenStream = await navigator.mediaDevices.getDisplayMedia({
+        video: { width: { ideal: 3840 }, height: { ideal: 2160 }, frameRate: { ideal: 30 } },
+        audio: true
+      });
+    } catch(e) {
+      setStatus('Screen share cancelled');
+      return;
+    }
+
+    $('screenPreview').srcObject = screenStream;
+    setStatus('Screen captured. Preparing recorders...');
+
+    // 2. Pick save folder (Chrome/Edge only) - do this AFTER screen picker
+    //    so both permission dialogs don't stack
+    if (window.showDirectoryPicker) {
+      setStatus('Pick a save folder (or cancel to use Downloads)...');
+      folderHandle = await pickFolder();
+    }
+
+    // 3. Re-acquire webcam stream (file:// protocol kills it after getDisplayMedia)
+    setStatus('Re-acquiring webcam...');
+    if (webcamStream) webcamStream.getTracks().forEach(t => t.stop());
+    const camId = $('webcamSelect').value;
+    const micId = $('micSelect').value;
+    try {
+      webcamStream = await navigator.mediaDevices.getUserMedia({
+        video: { deviceId: camId ? { exact: camId } : undefined, width: { ideal: 1920 }, height: { ideal: 1080 } },
+        audio: { deviceId: micId ? { exact: micId } : undefined, echoCancellation: true, noiseSuppression: true }
+      });
+      $('webcamPreview').srcObject = webcamStream;
+      startMeter(webcamStream);
+    } catch(e) {
+      console.error('Webcam re-acquire failed:', e);
+      setStatus('Webcam error: ' + e.message + ' — try serving via localhost (see info below)');
+      screenStream.getTracks().forEach(t => t.stop());
+      $('screenPreview').srcObject = null;
+      $('btnRecord').disabled = false;
+      return;
+    }
+
+    // 4. Find a supported codec
+    const codec = getCodec();
+    console.log('Using codec:', codec);
+
+    // 5. Set up webcam recorder
+    webcamChunks = [];
+    const wcOpts = codec ? { mimeType: codec, videoBitsPerSecond: 5_000_000 } : {};
+    webcamRecorder = new MediaRecorder(webcamStream, wcOpts);
+    webcamRecorder.ondataavailable = e => { if (e.data.size > 0) webcamChunks.push(e.data); };
+    webcamRecorder.onerror = e => console.error('Webcam recorder error:', e);
+
+    // 6. Set up screen recorder
+    screenChunks = [];
+    const scOpts = codec ? { mimeType: codec, videoBitsPerSecond: 8_000_000 } : {};
+    screenRecorder = new MediaRecorder(screenStream, scOpts);
+    screenRecorder.ondataavailable = e => { if (e.data.size > 0) screenChunks.push(e.data); };
+    screenRecorder.onerror = e => console.error('Screen recorder error:', e);
+
+    // If user clicks "Stop sharing" in browser chrome, auto-stop everything
+    screenStream.getVideoTracks()[0].onended = () => {
+      if (webcamRecorder?.state === 'recording') stopRecording();
+    };
+
+    // 7. Start both recorders
+    webcamRecorder.start(1000);
+    screenRecorder.start(1000);
+    startTimer();
+
+    setStatus('Recording...', true);
+    $('webcamRec').style.display = 'flex';
+    $('screenRec').style.display = 'flex';
+    $('btnRecord').disabled = true;
+    $('btnStop').disabled = false;
+    $('webcamSelect').disabled = true;
+    $('micSelect').disabled = true;
+    $('separateFiles').disabled = true;
+
+  } catch(e) {
+    console.error('startRecording failed:', e);
+    setStatus('Error: ' + e.message);
+    // Clean up if something went wrong
+    if (screenStream) {
+      screenStream.getTracks().forEach(t => t.stop());
+      $('screenPreview').srcObject = null;
+    }
+    $('btnRecord').disabled = false;
+  }
+}
+
+async function stopRecording() {
+  try {
+    setStatus('Saving...');
+    $('webcamRec').style.display = 'none';
+    $('screenRec').style.display = 'none';
+    $('btnStop').disabled = true;
+    stopTimer();
+
+    const webcamDone = new Promise(r => { webcamRecorder.onstop = r; });
+    const screenDone = new Promise(r => { screenRecorder.onstop = r; });
+    webcamRecorder.stop();
+    screenRecorder.stop();
+    await Promise.all([webcamDone, screenDone]);
+
+    // Stop screen capture
+    screenStream.getTracks().forEach(t => t.stop());
+    $('screenPreview').srcObject = null;
+
+    // Timestamp for filenames
+    const ts = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
+
+    const webcamBlob = new Blob(webcamChunks, { type: webcamRecorder.mimeType || 'video/webm' });
+    const screenBlob = new Blob(screenChunks, { type: screenRecorder.mimeType || 'video/webm' });
+
+    console.log('Webcam blob:', webcamBlob.size, 'Screen blob:', screenBlob.size);
+
+    const usedFS = await saveBlob(webcamBlob, `webcam-${ts}.webm`);
+    await saveBlob(screenBlob, `screen-${ts}.webm`);
+
+    const total = formatBytes(webcamBlob.size + screenBlob.size);
+    setStatus(
+      usedFS
+        ? `Saved to folder (${total} total)`
+        : `Downloaded (${total} total)`,
+      true
+    );
+  } catch(e) {
+    console.error('stopRecording failed:', e);
+    setStatus('Save error: ' + e.message);
+  }
+
+  $('btnRecord').disabled = false;
+  $('webcamSelect').disabled = false;
+  $('micSelect').disabled = false;
+  $('separateFiles').disabled = false;
+}
+
+// Wire up
+$('btnRecord').addEventListener('click', startRecording);
+$('btnStop').addEventListener('click', stopRecording);
+$('webcamSelect').addEventListener('change', startWebcamPreview);
+$('micSelect').addEventListener('change', startWebcamPreview);
+
+// Init
+loadDevices();
+navigator.mediaDevices.addEventListener('devicechange', loadDevices);
+</script>
+</body>
+</html>
