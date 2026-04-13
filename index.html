@@ -442,12 +442,25 @@ async function startWebcamPreview() {
 
   try {
     webcamStream = await navigator.mediaDevices.getUserMedia({
-      video: { deviceId: { exact: camId }, width: { ideal: 1920 }, height: { ideal: 1080 } },
-      audio: { deviceId: { exact: micId }, echoCancellation: true, noiseSuppression: true }
+      video: { deviceId: { ideal: camId } },
+      audio: { deviceId: { ideal: micId }, echoCancellation: true, noiseSuppression: true }
     });
+
+    // Diagnostic: check track states
+    const vTrack = webcamStream.getVideoTracks()[0];
+    const aTrack = webcamStream.getAudioTracks()[0];
+    const settings = vTrack?.getSettings();
+    console.log('Webcam video track:', vTrack?.label, 'enabled:', vTrack?.enabled, 'muted:', vTrack?.muted, 'readyState:', vTrack?.readyState, 'resolution:', settings?.width + 'x' + settings?.height);
+    console.log('Webcam audio track:', aTrack?.label, 'enabled:', aTrack?.enabled, 'muted:', aTrack?.muted, 'readyState:', aTrack?.readyState);
+
+    if (!vTrack || vTrack.muted || vTrack.readyState === 'ended') {
+      console.warn('Video track is not producing frames. Check macOS System Settings > Privacy & Security > Camera.');
+    }
+
     $('webcamPreview').srcObject = webcamStream;
     startMeter(webcamStream);
   } catch(e) {
+    console.error('getUserMedia error:', e);
     setStatus('Webcam/mic error: ' + e.message);
   }
 }
@@ -558,26 +571,34 @@ async function startRecording() {
       folderHandle = await pickFolder();
     }
 
-    // 3. Re-acquire webcam stream (file:// protocol kills it after getDisplayMedia)
+    // 3. Re-acquire webcam stream (may die after getDisplayMedia)
     setStatus('Re-acquiring webcam...');
     if (webcamStream) webcamStream.getTracks().forEach(t => t.stop());
     const camId = $('webcamSelect').value;
     const micId = $('micSelect').value;
     try {
       webcamStream = await navigator.mediaDevices.getUserMedia({
-        video: { deviceId: camId ? { exact: camId } : undefined, width: { ideal: 1920 }, height: { ideal: 1080 } },
-        audio: { deviceId: micId ? { exact: micId } : undefined, echoCancellation: true, noiseSuppression: true }
+        video: { deviceId: { ideal: camId } },
+        audio: { deviceId: { ideal: micId }, echoCancellation: true, noiseSuppression: true }
       });
       $('webcamPreview').srcObject = webcamStream;
       startMeter(webcamStream);
     } catch(e) {
       console.error('Webcam re-acquire failed:', e);
-      setStatus('Webcam error: ' + e.message + ' — try serving via localhost (see info below)');
+      setStatus('Webcam error: ' + e.message);
       screenStream.getTracks().forEach(t => t.stop());
       $('screenPreview').srcObject = null;
       $('btnRecord').disabled = false;
       return;
     }
+
+    // Diagnostic: log all track states before recording
+    const vt = webcamStream.getVideoTracks()[0];
+    const at = webcamStream.getAudioTracks()[0];
+    console.log('[PRE-RECORD] Webcam video:', vt?.label, 'enabled:', vt?.enabled, 'muted:', vt?.muted, 'state:', vt?.readyState);
+    console.log('[PRE-RECORD] Webcam audio:', at?.label, 'enabled:', at?.enabled, 'muted:', at?.muted, 'state:', at?.readyState);
+    const svt = screenStream.getVideoTracks()[0];
+    console.log('[PRE-RECORD] Screen video:', svt?.label, 'enabled:', svt?.enabled, 'muted:', svt?.muted, 'state:', svt?.readyState);
 
     // 4. Find a supported codec
     const codec = getCodec();
@@ -587,15 +608,24 @@ async function startRecording() {
     webcamChunks = [];
     const wcOpts = codec ? { mimeType: codec, videoBitsPerSecond: 5_000_000 } : {};
     webcamRecorder = new MediaRecorder(webcamStream, wcOpts);
-    webcamRecorder.ondataavailable = e => { if (e.data.size > 0) webcamChunks.push(e.data); };
+    webcamRecorder.ondataavailable = e => {
+      console.log('Webcam chunk:', e.data.size, 'bytes');
+      if (e.data.size > 0) webcamChunks.push(e.data);
+    };
     webcamRecorder.onerror = e => console.error('Webcam recorder error:', e);
 
     // 6. Set up screen recorder
     screenChunks = [];
     const scOpts = codec ? { mimeType: codec, videoBitsPerSecond: 8_000_000 } : {};
     screenRecorder = new MediaRecorder(screenStream, scOpts);
-    screenRecorder.ondataavailable = e => { if (e.data.size > 0) screenChunks.push(e.data); };
+    screenRecorder.ondataavailable = e => {
+      console.log('Screen chunk:', e.data.size, 'bytes');
+      if (e.data.size > 0) screenChunks.push(e.data);
+    };
     screenRecorder.onerror = e => console.error('Screen recorder error:', e);
+
+    console.log('Webcam recorder state:', webcamRecorder.state);
+    console.log('Screen recorder state:', screenRecorder.state);
 
     // If user clicks "Stop sharing" in browser chrome, auto-stop everything
     screenStream.getVideoTracks()[0].onended = () => {
