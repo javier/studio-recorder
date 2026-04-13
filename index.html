@@ -4,368 +4,488 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Studio Recorder</title>
+<meta name="description" content="Record webcam, microphone, and screen as separate files in your browser. No install, no account, no upload. Free and open source.">
+<meta property="og:title" content="Studio Recorder">
+<meta property="og:description" content="Record webcam + screen as separate files, right in your browser.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='40' fill='%23e04040'/><circle cx='50' cy='50' r='18' fill='%230c0c0e'/></svg>">
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700;800&display=swap');
 
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
   :root {
-    --bg: #0c0c0e;
-    --surface: #16161a;
-    --surface2: #1e1e24;
-    --border: #2a2a32;
-    --text: #e2e2e6;
-    --text-dim: #7a7a86;
-    --accent: #e04040;
-    --accent-glow: rgba(224, 64, 64, 0.3);
-    --green: #34d399;
-    --green-glow: rgba(52, 211, 153, 0.3);
-    --amber: #fbbf24;
+    --bg: #08080a;
+    --surface: #111114;
+    --surface-up: #18181c;
+    --border: #252530;
+    --border-light: #303040;
+    --text: #dcdce0;
+    --text-dim: #64647a;
+    --accent: #e03e3e;
+    --accent-soft: #e03e3e22;
+    --accent-glow: rgba(224, 62, 62, 0.35);
+    --green: #2dd4a0;
+    --green-soft: #2dd4a022;
+    --amber: #f0b429;
+    --radius: 10px;
   }
 
   body {
-    font-family: 'Outfit', sans-serif;
+    font-family: 'Syne', sans-serif;
     background: var(--bg);
     color: var(--text);
     min-height: 100vh;
+    background-image:
+      radial-gradient(ellipse 80% 60% at 50% 0%, rgba(224,62,62,0.04) 0%, transparent 60%),
+      radial-gradient(circle at 50% 100%, rgba(45,212,160,0.02) 0%, transparent 40%);
   }
 
   .app {
-    max-width: 900px;
+    max-width: 920px;
     margin: 0 auto;
-    padding: 32px 24px;
+    padding: 40px 24px 60px;
+    animation: fadeUp 0.5s ease-out;
   }
 
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── Header ── */
   header {
     display: flex;
     align-items: center;
-    gap: 12px;
-    margin-bottom: 36px;
+    gap: 14px;
+    margin-bottom: 40px;
   }
 
-  header .icon {
-    width: 10px;
-    height: 10px;
+  .rec-dot {
+    width: 11px;
+    height: 11px;
     border-radius: 50%;
     background: var(--accent);
-    box-shadow: 0 0 12px var(--accent-glow);
+    box-shadow: 0 0 10px var(--accent-glow);
+    transition: all 0.3s;
   }
 
-  header .icon.recording {
-    animation: pulse 1s ease-in-out infinite;
+  .rec-dot.live {
+    animation: throb 1.2s ease-in-out infinite;
   }
 
-  @keyframes pulse {
-    0%, 100% { opacity: 1; box-shadow: 0 0 12px var(--accent-glow); }
-    50% { opacity: 0.4; box-shadow: 0 0 4px var(--accent-glow); }
+  @keyframes throb {
+    0%, 100% { box-shadow: 0 0 10px var(--accent-glow); transform: scale(1); }
+    50% { box-shadow: 0 0 20px var(--accent-glow), 0 0 40px rgba(224,62,62,0.1); transform: scale(1.15); }
   }
 
   header h1 {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 18px;
-    font-weight: 600;
-    letter-spacing: 1px;
-    text-transform: uppercase;
+    font-weight: 700;
+    font-size: 20px;
+    letter-spacing: 0.5px;
   }
 
   .timer {
     margin-left: auto;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 28px;
-    font-weight: 700;
+    font-family: 'DM Mono', monospace;
+    font-size: 26px;
+    font-weight: 500;
     color: var(--text-dim);
-    letter-spacing: 2px;
-    transition: color 0.3s;
+    letter-spacing: 3px;
+    transition: color 0.4s;
+    user-select: none;
   }
 
-  .timer.active { color: var(--accent); }
+  .timer.live { color: var(--accent); }
 
+  /* ── Device selectors ── */
   .config {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 16px;
-    margin-bottom: 24px;
+    gap: 14px;
+    margin-bottom: 20px;
   }
 
   .field {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 5px;
   }
 
   .field label {
-    font-size: 11px;
-    font-weight: 600;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    font-weight: 500;
     text-transform: uppercase;
-    letter-spacing: 1.5px;
+    letter-spacing: 2px;
     color: var(--text-dim);
-    font-family: 'JetBrains Mono', monospace;
   }
 
   .field select {
     background: var(--surface);
     color: var(--text);
     border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 10px 12px;
-    font-family: 'Outfit', sans-serif;
-    font-size: 14px;
+    border-radius: var(--radius);
+    padding: 10px 36px 10px 12px;
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
     outline: none;
     cursor: pointer;
-    transition: border-color 0.2s;
+    transition: border-color 0.2s, box-shadow 0.2s;
     appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%237a7a86'%3E%3Cpath d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2364647a' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: right 12px center;
   }
 
-  .field select:hover { border-color: #3a3a44; }
-  .field select:focus { border-color: var(--accent); }
-  .field select:disabled { opacity: 0.4; cursor: not-allowed; }
+  .field select:hover { border-color: var(--border-light); }
+  .field select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .field select:disabled { opacity: 0.35; cursor: not-allowed; }
 
+  .option-row {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 2px 0 8px;
+  }
+
+  .option-row input[type="checkbox"] {
+    accent-color: var(--accent);
+    width: 15px;
+    height: 15px;
+    cursor: pointer;
+  }
+
+  .option-row label {
+    font-size: 12px;
+    color: var(--text-dim);
+    cursor: pointer;
+    line-height: 1.4;
+  }
+
+  /* ── Preview panels ── */
   .previews {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 16px;
-    margin-bottom: 24px;
+    gap: 14px;
+    margin-bottom: 20px;
   }
 
-  .preview-box {
+  .panel {
     position: relative;
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: var(--radius);
     overflow: hidden;
     aspect-ratio: 16/9;
+    transition: border-color 0.3s;
   }
 
-  .preview-box video {
+  .panel.active { border-color: var(--border-light); }
+
+  .panel video {
     width: 100%;
     height: 100%;
     object-fit: cover;
     display: block;
   }
 
-  .preview-label {
+  .panel-label {
     position: absolute;
     top: 8px;
     left: 8px;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
-    font-weight: 600;
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    font-weight: 500;
     text-transform: uppercase;
-    letter-spacing: 1px;
-    background: rgba(0,0,0,0.7);
-    padding: 4px 8px;
-    border-radius: 4px;
+    letter-spacing: 1.5px;
+    background: rgba(0,0,0,0.65);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    padding: 4px 9px;
+    border-radius: 5px;
     color: var(--text-dim);
   }
 
-  .rec-badge {
+  .panel-empty {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: var(--text-dim);
+    pointer-events: none;
+  }
+
+  .panel-empty svg { opacity: 0.25; }
+
+  .panel-empty span {
+    font-size: 11px;
+    opacity: 0.5;
+    font-family: 'DM Mono', monospace;
+  }
+
+  .live-badge {
     position: absolute;
     top: 8px;
     right: 8px;
     display: none;
     align-items: center;
     gap: 5px;
-    background: rgba(224, 64, 64, 0.9);
-    padding: 3px 8px;
-    border-radius: 4px;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 1px;
-    animation: pulse 1s ease-in-out infinite;
+    background: var(--accent);
+    padding: 3px 9px;
+    border-radius: 5px;
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 1.5px;
+    color: white;
   }
 
-  .rec-badge .dot {
-    width: 6px; height: 6px;
+  .live-badge .pip {
+    width: 5px;
+    height: 5px;
     border-radius: 50%;
     background: white;
+    animation: throb 1.2s ease-in-out infinite;
   }
 
-  .meter-section { margin-bottom: 24px; }
+  /* ── Audio meter ── */
+  .meter { margin-bottom: 24px; }
 
-  .meter-section label {
-    display: block;
-    font-size: 11px;
-    font-weight: 600;
+  .meter-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 7px;
+  }
+
+  .meter-label span {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    font-weight: 500;
     text-transform: uppercase;
-    letter-spacing: 1.5px;
+    letter-spacing: 2px;
     color: var(--text-dim);
-    font-family: 'JetBrains Mono', monospace;
-    margin-bottom: 8px;
+  }
+
+  .meter-label .db {
+    margin-left: auto;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    opacity: 0.6;
   }
 
   .meter-track {
     width: 100%;
-    height: 8px;
+    height: 6px;
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 4px;
+    border-radius: 3px;
     overflow: hidden;
   }
 
-  .meter-fill {
+  .meter-bar {
     height: 100%;
     width: 0%;
+    border-radius: 3px;
     background: var(--green);
-    border-radius: 4px;
-    transition: width 0.05s linear;
+    transition: width 0.06s linear, background 0.15s;
   }
 
-  .meter-fill.hot { background: var(--amber); }
-  .meter-fill.clip { background: var(--accent); }
+  .meter-bar.warm { background: var(--amber); }
+  .meter-bar.hot { background: var(--accent); }
 
+  /* ── Controls ── */
   .controls {
     display: flex;
-    gap: 12px;
+    gap: 10px;
     align-items: center;
-    flex-wrap: wrap;
   }
 
-  button {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 13px;
-    font-weight: 600;
+  .btn {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    font-weight: 500;
     text-transform: uppercase;
-    letter-spacing: 1px;
+    letter-spacing: 1.5px;
     border: none;
-    border-radius: 6px;
-    padding: 12px 28px;
+    border-radius: var(--radius);
+    padding: 13px 30px;
     cursor: pointer;
     transition: all 0.2s;
   }
 
-  button:disabled { opacity: 0.3; cursor: not-allowed; }
+  .btn:disabled { opacity: 0.25; cursor: not-allowed; pointer-events: none; }
 
-  .btn-record {
+  .btn-rec {
     background: var(--accent);
     color: white;
-    box-shadow: 0 0 20px var(--accent-glow);
+    box-shadow: 0 2px 20px var(--accent-glow);
   }
 
-  .btn-record:hover:not(:disabled) {
-    background: #c43535;
-    box-shadow: 0 0 30px var(--accent-glow);
+  .btn-rec:hover:not(:disabled) {
+    background: #cc3535;
+    box-shadow: 0 2px 30px var(--accent-glow);
+    transform: translateY(-1px);
   }
+
+  .btn-rec:active:not(:disabled) { transform: translateY(0); }
 
   .btn-stop {
-    background: var(--surface2);
+    background: var(--surface-up);
     color: var(--text);
     border: 1px solid var(--border);
   }
 
   .btn-stop:hover:not(:disabled) {
-    background: #26262e;
-    border-color: var(--text-dim);
-  }
-
-  .status {
-    margin-left: 16px;
-    font-size: 13px;
-    color: var(--text-dim);
-  }
-
-  .status.ok { color: var(--green); }
-
-  .info {
-    margin-top: 24px;
-    padding: 12px 16px;
     background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 6px;
+    border-color: var(--border-light);
+    transform: translateY(-1px);
+  }
+
+  .status-text {
+    margin-left: 14px;
     font-size: 12px;
     color: var(--text-dim);
-    line-height: 1.8;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: 'DM Mono', monospace;
+    transition: color 0.3s;
   }
 
-  .info code {
-    color: var(--text);
-    background: var(--surface2);
-    padding: 1px 5px;
-    border-radius: 3px;
-  }
+  .status-text.ok { color: var(--green); }
 
-  .checkbox-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    grid-column: 1 / -1;
-  }
-
-  .checkbox-row input[type="checkbox"] {
-    accent-color: var(--accent);
-    width: 16px; height: 16px;
-    cursor: pointer;
-  }
-
-  .checkbox-row label {
-    font-size: 13px;
+  /* ── Footer ── */
+  .footer {
+    margin-top: 32px;
+    padding: 16px 18px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 12px;
     color: var(--text-dim);
-    cursor: pointer;
+    line-height: 1.9;
+  }
+
+  .footer code {
+    color: var(--text);
+    background: var(--surface-up);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+  }
+
+  .footer-meta {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 20px;
+    align-items: center;
+    font-size: 11px;
+  }
+
+  .footer-meta a {
+    color: var(--text-dim);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+
+  .footer-meta a:hover { color: var(--text); }
+
+  .footer-meta .privacy {
+    color: var(--text-dim);
+    opacity: 0.6;
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 640px) {
+    .config { grid-template-columns: 1fr; }
+    .previews { grid-template-columns: 1fr; }
+    .timer { font-size: 20px; }
+    header h1 { font-size: 16px; }
+    .controls { flex-wrap: wrap; }
+    .status-text { margin-left: 0; margin-top: 8px; width: 100%; }
   }
 </style>
 </head>
 <body>
 <div class="app">
+
   <header>
-    <div class="icon" id="headerDot"></div>
+    <div class="rec-dot" id="headerDot"></div>
     <h1>Studio Recorder</h1>
     <div class="timer" id="timer">00:00:00</div>
   </header>
 
   <div class="config">
     <div class="field">
-      <label>Webcam</label>
-      <select id="webcamSelect"><option>Loading...</option></select>
+      <label>Camera</label>
+      <select id="webcamSelect"><option>Loading devices...</option></select>
     </div>
     <div class="field">
       <label>Microphone</label>
-      <select id="micSelect"><option>Loading...</option></select>
+      <select id="micSelect"><option>Loading devices...</option></select>
     </div>
-    <div class="checkbox-row">
+    <div class="option-row">
       <input type="checkbox" id="separateFiles" checked>
-      <label for="separateFiles">Record webcam and screen as separate files (recommended for editing)</label>
+      <label for="separateFiles">Record webcam and screen as separate files (recommended for post-production)</label>
     </div>
   </div>
 
   <div class="previews">
-    <div class="preview-box">
+    <div class="panel" id="webcamPanel">
       <video id="webcamPreview" autoplay muted playsinline></video>
-      <div class="preview-label">Webcam</div>
-      <div class="rec-badge" id="webcamRec"><div class="dot"></div>REC</div>
+      <div class="panel-label">Camera</div>
+      <div class="live-badge" id="webcamLive"><div class="pip"></div>REC</div>
+      <div class="panel-empty" id="webcamEmpty">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+        <span>Awaiting camera</span>
+      </div>
     </div>
-    <div class="preview-box">
+    <div class="panel" id="screenPanel">
       <video id="screenPreview" autoplay muted playsinline></video>
-      <div class="preview-label">Screen</div>
-      <div class="rec-badge" id="screenRec"><div class="dot"></div>REC</div>
+      <div class="panel-label">Screen</div>
+      <div class="live-badge" id="screenLive"><div class="pip"></div>REC</div>
+      <div class="panel-empty" id="screenEmpty">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        <span>Starts on record</span>
+      </div>
     </div>
   </div>
 
-  <div class="meter-section">
-    <label>Mic Level</label>
+  <div class="meter">
+    <div class="meter-label">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+      <span>Mic Level</span>
+      <span class="db" id="dbLabel"></span>
+    </div>
     <div class="meter-track">
-      <div class="meter-fill" id="meterFill"></div>
+      <div class="meter-bar" id="meterBar"></div>
     </div>
   </div>
 
   <div class="controls">
-    <button class="btn-record" id="btnRecord">Start Recording</button>
-    <button class="btn-stop" id="btnStop" disabled>Stop &amp; Save</button>
-    <span class="status" id="status"></span>
+    <button class="btn btn-rec" id="btnRecord">Start Recording</button>
+    <button class="btn btn-stop" id="btnStop" disabled>Stop &amp; Save</button>
+    <span class="status-text" id="status"></span>
   </div>
 
-  <div class="info">
-    Output: <code>webcam-[timestamp].webm</code> + <code>screen-[timestamp].webm</code><br>
-    On Chrome/Edge you can pick a save folder. Other browsers will download to your default location.<br>
-    The browser will ask which screen or window to share when you click Start.<br>
-    Tick "Share audio" in the browser picker to capture system sound with the screen.<br><br>
-    <strong style="color:var(--text)">If recording fails on file://</strong>, serve over localhost instead:<br>
-    <code>cd /path/to/folder && python3 -m http.server 8080</code><br>
-    Then open <code>http://localhost:8080/studio-recorder.html</code>
+  <div class="footer">
+    Output: <code>webcam-[timestamp].webm</code> + <code>screen-[timestamp].webm</code> (VP9/Opus)<br>
+    On Chrome/Edge you can choose a save folder. Other browsers download to your default location.<br>
+    Tick <strong style="color:var(--text)">Share audio</strong> in the browser's screen picker to include system sound.<br>
+    Both files share the same start timestamp for easy sync in your editor.
+    <div class="footer-meta">
+      <a href="https://github.com/javier/studio-recorder" target="_blank" rel="noopener">GitHub</a>
+      <span class="privacy">Everything runs locally. Nothing is uploaded.</span>
+    </div>
   </div>
+
 </div>
 
 <script>
@@ -385,25 +505,27 @@ let meterRAF = null;
 let folderHandle = null;
 
 function getCodec() {
-  const codecs = [
+  const prefer = [
     'video/webm;codecs=vp9,opus',
     'video/webm;codecs=vp8,opus',
     'video/webm;codecs=vp9',
     'video/webm;codecs=vp8',
     'video/webm',
   ];
-  for (const c of codecs) {
+  for (const c of prefer) {
     if (MediaRecorder.isTypeSupported(c)) return c;
   }
   return '';
 }
 
+/* ── Device enumeration ── */
+
 async function loadDevices() {
   try {
-    const tempStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
-    tempStream.getTracks().forEach(t => t.stop());
-  } catch(e) {
-    setStatus('Grant camera/mic permission to continue');
+    const tmp = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+    tmp.getTracks().forEach(t => t.stop());
+  } catch {
+    setStatus('Grant camera and microphone access to continue');
     return;
   }
 
@@ -414,28 +536,29 @@ async function loadDevices() {
   micSel.innerHTML = '';
 
   devices.filter(d => d.kind === 'videoinput').forEach((d, i) => {
-    const opt = document.createElement('option');
-    opt.value = d.deviceId;
-    opt.textContent = d.label || `Camera ${i + 1}`;
-    webcamSel.appendChild(opt);
+    const o = document.createElement('option');
+    o.value = d.deviceId;
+    o.textContent = d.label || `Camera ${i + 1}`;
+    webcamSel.appendChild(o);
   });
 
   devices.filter(d => d.kind === 'audioinput').forEach((d, i) => {
-    const opt = document.createElement('option');
-    opt.value = d.deviceId;
-    opt.textContent = d.label || `Microphone ${i + 1}`;
-    micSel.appendChild(opt);
+    const o = document.createElement('option');
+    o.value = d.deviceId;
+    o.textContent = d.label || `Microphone ${i + 1}`;
+    micSel.appendChild(o);
   });
 
-  if (!webcamSel.options.length) webcamSel.innerHTML = '<option value="">No webcam found</option>';
-  if (!micSel.options.length) micSel.innerHTML = '<option value="">No mic found</option>';
+  if (!webcamSel.options.length) webcamSel.innerHTML = '<option value="">No camera found</option>';
+  if (!micSel.options.length) micSel.innerHTML = '<option value="">No microphone found</option>';
 
   startWebcamPreview();
 }
 
+/* ── Webcam preview ── */
+
 async function startWebcamPreview() {
   if (webcamStream) webcamStream.getTracks().forEach(t => t.stop());
-
   const camId = $('webcamSelect').value;
   const micId = $('micSelect').value;
   if (!camId) return;
@@ -445,51 +568,48 @@ async function startWebcamPreview() {
       video: { deviceId: { ideal: camId } },
       audio: { deviceId: { ideal: micId }, echoCancellation: true, noiseSuppression: true }
     });
-
-    // Diagnostic: check track states
-    const vTrack = webcamStream.getVideoTracks()[0];
-    const aTrack = webcamStream.getAudioTracks()[0];
-    const settings = vTrack?.getSettings();
-    console.log('Webcam video track:', vTrack?.label, 'enabled:', vTrack?.enabled, 'muted:', vTrack?.muted, 'readyState:', vTrack?.readyState, 'resolution:', settings?.width + 'x' + settings?.height);
-    console.log('Webcam audio track:', aTrack?.label, 'enabled:', aTrack?.enabled, 'muted:', aTrack?.muted, 'readyState:', aTrack?.readyState);
-
-    if (!vTrack || vTrack.muted || vTrack.readyState === 'ended') {
-      console.warn('Video track is not producing frames. Check macOS System Settings > Privacy & Security > Camera.');
-    }
-
     $('webcamPreview').srcObject = webcamStream;
+    $('webcamEmpty').style.display = 'none';
+    $('webcamPanel').classList.add('active');
     startMeter(webcamStream);
-  } catch(e) {
-    console.error('getUserMedia error:', e);
-    setStatus('Webcam/mic error: ' + e.message);
+  } catch (e) {
+    setStatus('Camera/mic error: ' + e.message);
   }
 }
+
+/* ── Audio metering ── */
 
 function startMeter(stream) {
   if (audioCtx) audioCtx.close();
   audioCtx = new AudioContext();
-  const source = audioCtx.createMediaStreamSource(stream);
   analyser = audioCtx.createAnalyser();
   analyser.fftSize = 256;
-  source.connect(analyser);
-  updateMeter();
+  audioCtx.createMediaStreamSource(stream).connect(analyser);
+  tickMeter();
 }
 
-function updateMeter() {
+function tickMeter() {
   if (!analyser) return;
-  const data = new Uint8Array(analyser.fftSize);
-  analyser.getByteTimeDomainData(data);
+  const buf = new Uint8Array(analyser.fftSize);
+  analyser.getByteTimeDomainData(buf);
   let sum = 0;
-  for (let i = 0; i < data.length; i++) {
-    const v = (data[i] - 128) / 128;
+  for (let i = 0; i < buf.length; i++) {
+    const v = (buf[i] - 128) / 128;
     sum += v * v;
   }
-  const pct = Math.min(100, Math.sqrt(sum / data.length) * 300);
-  const fill = $('meterFill');
-  fill.style.width = pct + '%';
-  fill.className = 'meter-fill' + (pct > 85 ? ' clip' : pct > 60 ? ' hot' : '');
-  meterRAF = requestAnimationFrame(updateMeter);
+  const rms = Math.sqrt(sum / buf.length);
+  const pct = Math.min(100, rms * 300);
+  const bar = $('meterBar');
+  bar.style.width = pct + '%';
+  bar.className = 'meter-bar' + (pct > 85 ? ' hot' : pct > 55 ? ' warm' : '');
+
+  const db = rms > 0 ? Math.max(-60, 20 * Math.log10(rms)) : -60;
+  $('dbLabel').textContent = db > -60 ? db.toFixed(0) + ' dB' : '';
+
+  meterRAF = requestAnimationFrame(tickMeter);
 }
+
+/* ── Timer ── */
 
 function startTimer() {
   startTime = Date.now();
@@ -500,19 +620,22 @@ function startTimer() {
     const s = String(Math.floor((ms % 60000) / 1000)).padStart(2, '0');
     $('timer').textContent = `${h}:${m}:${s}`;
   }, 200);
-  $('timer').classList.add('active');
-  $('headerDot').classList.add('recording');
+  $('timer').classList.add('live');
+  $('headerDot').classList.add('live');
 }
 
 function stopTimer() {
   clearInterval(timerInterval);
-  $('timer').classList.remove('active');
-  $('headerDot').classList.remove('recording');
+  $('timer').classList.remove('live');
+  $('headerDot').classList.remove('live');
 }
 
+/* ── Helpers ── */
+
 function setStatus(msg, ok = false) {
-  $('status').textContent = msg;
-  $('status').className = 'status' + (ok ? ' ok' : '');
+  const el = $('status');
+  el.textContent = msg;
+  el.className = 'status-text' + (ok ? ' ok' : '');
 }
 
 function formatBytes(b) {
@@ -523,9 +646,8 @@ function formatBytes(b) {
 
 async function pickFolder() {
   if (!window.showDirectoryPicker) return null;
-  try {
-    return await window.showDirectoryPicker({ mode: 'readwrite' });
-  } catch(e) { return null; }
+  try { return await window.showDirectoryPicker({ mode: 'readwrite' }); }
+  catch { return null; }
 }
 
 async function saveBlob(blob, filename) {
@@ -536,123 +658,98 @@ async function saveBlob(blob, filename) {
       await w.write(blob);
       await w.close();
       return true;
-    } catch(e) { console.error('FS save failed:', e); }
+    } catch { /* fall through to download */ }
   }
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
+  Object.assign(document.createElement('a'), { href: url, download: filename }).click();
   setTimeout(() => URL.revokeObjectURL(url), 10000);
   return false;
 }
 
+/* ── Recording ── */
+
 async function startRecording() {
   try {
-    // 1. Get screen stream FIRST (browser shows its own picker)
+    // 1. Screen capture (browser shows its own picker)
     setStatus('Pick your screen...');
     try {
       screenStream = await navigator.mediaDevices.getDisplayMedia({
         video: { width: { ideal: 3840 }, height: { ideal: 2160 }, frameRate: { ideal: 30 } },
         audio: true
       });
-    } catch(e) {
-      setStatus('Screen share cancelled');
+    } catch {
+      setStatus('Screen share was cancelled');
       return;
     }
 
     $('screenPreview').srcObject = screenStream;
-    setStatus('Screen captured. Preparing recorders...');
+    $('screenEmpty').style.display = 'none';
+    $('screenPanel').classList.add('active');
 
-    // 2. Pick save folder (Chrome/Edge only) - do this AFTER screen picker
-    //    so both permission dialogs don't stack
+    // 2. Save folder (Chromium only)
     if (window.showDirectoryPicker) {
-      setStatus('Pick a save folder (or cancel to use Downloads)...');
+      setStatus('Pick a save folder (or cancel for Downloads)...');
       folderHandle = await pickFolder();
     }
 
-    // 3. Re-acquire webcam stream (may die after getDisplayMedia)
-    setStatus('Re-acquiring webcam...');
+    // 3. Re-acquire webcam (browsers can drop the stream after getDisplayMedia)
+    setStatus('Preparing...');
     if (webcamStream) webcamStream.getTracks().forEach(t => t.stop());
-    const camId = $('webcamSelect').value;
-    const micId = $('micSelect').value;
     try {
       webcamStream = await navigator.mediaDevices.getUserMedia({
-        video: { deviceId: { ideal: camId } },
-        audio: { deviceId: { ideal: micId }, echoCancellation: true, noiseSuppression: true }
+        video: { deviceId: { ideal: $('webcamSelect').value } },
+        audio: { deviceId: { ideal: $('micSelect').value }, echoCancellation: true, noiseSuppression: true }
       });
       $('webcamPreview').srcObject = webcamStream;
+      $('webcamEmpty').style.display = 'none';
       startMeter(webcamStream);
-    } catch(e) {
-      console.error('Webcam re-acquire failed:', e);
-      setStatus('Webcam error: ' + e.message);
+    } catch (e) {
+      setStatus('Camera error: ' + e.message);
       screenStream.getTracks().forEach(t => t.stop());
       $('screenPreview').srcObject = null;
+      $('screenEmpty').style.display = '';
       $('btnRecord').disabled = false;
       return;
     }
 
-    // Diagnostic: log all track states before recording
-    const vt = webcamStream.getVideoTracks()[0];
-    const at = webcamStream.getAudioTracks()[0];
-    console.log('[PRE-RECORD] Webcam video:', vt?.label, 'enabled:', vt?.enabled, 'muted:', vt?.muted, 'state:', vt?.readyState);
-    console.log('[PRE-RECORD] Webcam audio:', at?.label, 'enabled:', at?.enabled, 'muted:', at?.muted, 'state:', at?.readyState);
-    const svt = screenStream.getVideoTracks()[0];
-    console.log('[PRE-RECORD] Screen video:', svt?.label, 'enabled:', svt?.enabled, 'muted:', svt?.muted, 'state:', svt?.readyState);
-
-    // 4. Find a supported codec
+    // 4. Create recorders
     const codec = getCodec();
-    console.log('Using codec:', codec);
 
-    // 5. Set up webcam recorder
     webcamChunks = [];
-    const wcOpts = codec ? { mimeType: codec, videoBitsPerSecond: 5_000_000 } : {};
-    webcamRecorder = new MediaRecorder(webcamStream, wcOpts);
-    webcamRecorder.ondataavailable = e => {
-      console.log('Webcam chunk:', e.data.size, 'bytes');
-      if (e.data.size > 0) webcamChunks.push(e.data);
-    };
-    webcamRecorder.onerror = e => console.error('Webcam recorder error:', e);
+    webcamRecorder = new MediaRecorder(webcamStream,
+      codec ? { mimeType: codec, videoBitsPerSecond: 5_000_000 } : {});
+    webcamRecorder.ondataavailable = e => { if (e.data.size > 0) webcamChunks.push(e.data); };
 
-    // 6. Set up screen recorder
     screenChunks = [];
-    const scOpts = codec ? { mimeType: codec, videoBitsPerSecond: 8_000_000 } : {};
-    screenRecorder = new MediaRecorder(screenStream, scOpts);
-    screenRecorder.ondataavailable = e => {
-      console.log('Screen chunk:', e.data.size, 'bytes');
-      if (e.data.size > 0) screenChunks.push(e.data);
-    };
-    screenRecorder.onerror = e => console.error('Screen recorder error:', e);
+    screenRecorder = new MediaRecorder(screenStream,
+      codec ? { mimeType: codec, videoBitsPerSecond: 8_000_000 } : {});
+    screenRecorder.ondataavailable = e => { if (e.data.size > 0) screenChunks.push(e.data); };
 
-    console.log('Webcam recorder state:', webcamRecorder.state);
-    console.log('Screen recorder state:', screenRecorder.state);
-
-    // If user clicks "Stop sharing" in browser chrome, auto-stop everything
+    // Auto-stop if user clicks the browser's "Stop sharing" button
     screenStream.getVideoTracks()[0].onended = () => {
       if (webcamRecorder?.state === 'recording') stopRecording();
     };
 
-    // 7. Start both recorders
+    // 5. Start
     webcamRecorder.start(1000);
     screenRecorder.start(1000);
     startTimer();
 
     setStatus('Recording...', true);
-    $('webcamRec').style.display = 'flex';
-    $('screenRec').style.display = 'flex';
+    $('webcamLive').style.display = 'flex';
+    $('screenLive').style.display = 'flex';
     $('btnRecord').disabled = true;
     $('btnStop').disabled = false;
     $('webcamSelect').disabled = true;
     $('micSelect').disabled = true;
     $('separateFiles').disabled = true;
 
-  } catch(e) {
-    console.error('startRecording failed:', e);
+  } catch (e) {
     setStatus('Error: ' + e.message);
-    // Clean up if something went wrong
     if (screenStream) {
       screenStream.getTracks().forEach(t => t.stop());
       $('screenPreview').srcObject = null;
+      $('screenEmpty').style.display = '';
     }
     $('btnRecord').disabled = false;
   }
@@ -661,41 +758,34 @@ async function startRecording() {
 async function stopRecording() {
   try {
     setStatus('Saving...');
-    $('webcamRec').style.display = 'none';
-    $('screenRec').style.display = 'none';
+    $('webcamLive').style.display = 'none';
+    $('screenLive').style.display = 'none';
     $('btnStop').disabled = true;
     stopTimer();
 
-    const webcamDone = new Promise(r => { webcamRecorder.onstop = r; });
-    const screenDone = new Promise(r => { screenRecorder.onstop = r; });
+    const done = Promise.all([
+      new Promise(r => { webcamRecorder.onstop = r; }),
+      new Promise(r => { screenRecorder.onstop = r; })
+    ]);
     webcamRecorder.stop();
     screenRecorder.stop();
-    await Promise.all([webcamDone, screenDone]);
+    await done;
 
-    // Stop screen capture
     screenStream.getTracks().forEach(t => t.stop());
     $('screenPreview').srcObject = null;
+    $('screenEmpty').style.display = '';
+    $('screenPanel').classList.remove('active');
 
-    // Timestamp for filenames
     const ts = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
+    const wBlob = new Blob(webcamChunks, { type: webcamRecorder.mimeType || 'video/webm' });
+    const sBlob = new Blob(screenChunks, { type: screenRecorder.mimeType || 'video/webm' });
 
-    const webcamBlob = new Blob(webcamChunks, { type: webcamRecorder.mimeType || 'video/webm' });
-    const screenBlob = new Blob(screenChunks, { type: screenRecorder.mimeType || 'video/webm' });
+    const usedFS = await saveBlob(wBlob, `webcam-${ts}.webm`);
+    await saveBlob(sBlob, `screen-${ts}.webm`);
 
-    console.log('Webcam blob:', webcamBlob.size, 'Screen blob:', screenBlob.size);
-
-    const usedFS = await saveBlob(webcamBlob, `webcam-${ts}.webm`);
-    await saveBlob(screenBlob, `screen-${ts}.webm`);
-
-    const total = formatBytes(webcamBlob.size + screenBlob.size);
-    setStatus(
-      usedFS
-        ? `Saved to folder (${total} total)`
-        : `Downloaded (${total} total)`,
-      true
-    );
-  } catch(e) {
-    console.error('stopRecording failed:', e);
+    const total = formatBytes(wBlob.size + sBlob.size);
+    setStatus(usedFS ? `Saved to folder (${total})` : `Downloaded (${total})`, true);
+  } catch (e) {
     setStatus('Save error: ' + e.message);
   }
 
@@ -705,13 +795,13 @@ async function stopRecording() {
   $('separateFiles').disabled = false;
 }
 
-// Wire up
+/* ── Init ── */
+
 $('btnRecord').addEventListener('click', startRecording);
 $('btnStop').addEventListener('click', stopRecording);
 $('webcamSelect').addEventListener('change', startWebcamPreview);
 $('micSelect').addEventListener('change', startWebcamPreview);
 
-// Init
 loadDevices();
 navigator.mediaDevices.addEventListener('devicechange', loadDevices);
 </script>
